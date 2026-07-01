@@ -4,6 +4,8 @@
 
 🔗 **Live console:** https://ashwatha4502.github.io/a-acaf-agent-assurance/
 
+The live console includes an **Audit your own** mode: paste or edit an agent config in the browser and get it scored instantly against all 13 controls — the scoring engine is ported to JavaScript and runs entirely client-side, no backend required.
+
 As enterprises move from AI pilots to *autonomous agents with real permissions* — agents that can read regulated data, move money, and trigger downstream systems — the hard problem stops being "can we build it" and becomes "can we govern it once it's live." A-ACAF audits deployed agents against a consolidated control set from three governance frameworks and produces audit-grade findings, a severity-weighted assurance score, and a board-ready report.
 
 <p align="center">
@@ -32,6 +34,52 @@ That gap is exactly where compliance failures will surface first. A-ACAF is a wo
 | Model lifecycle | Model version pinned; change review before production | NIST MANAGE-4.1 · ISO A.6.2.5 |
 
 The full mapping is the single source of truth in [`rubric/controls.py`](rubric/controls.py) — the audit engine and the report generator both consume it, so a control is defined once and flows everywhere.
+
+## Try it yourself (live, in the browser)
+
+Open the [live console](https://ashwatha4502.github.io/a-acaf-agent-assurance/), click **Audit your own**, and paste one of the configs below into the editor. The scoring runs entirely client-side — no data leaves your browser.
+
+**A broken agent — scores 28/100 (F, not fit for production):** wildcard S3 access over PII, no logging, no guardrails, no human oversight, unpinned model.
+
+```json
+{
+  "agent_id": "demo-broken",
+  "agent_name": "support-bot",
+  "environment": "production",
+  "iam_policy": { "statements": [{ "actions": ["s3:*"], "resources": ["*"] }] },
+  "accessible_resources": [{ "arn": "arn:aws:s3:::customer-records", "data_classification": "PII" }],
+  "data_boundary": { "mode": "unrestricted" },
+  "logging": { "action_trace_enabled": false },
+  "guardrails": {},
+  "has_downstream_execution": true,
+  "human_oversight": {},
+  "high_risk_actions": ["issue_refund", "send_email"],
+  "model": { "model_id": "anthropic.claude", "version": "latest" },
+  "lifecycle": {}
+}
+```
+
+**The same agent, remediated — scores 100/100 (A, deployment-ready):** least-privilege read-only access, immutable attributable logging, guardrails on input and output, human approval on high-risk actions, a kill switch, a pinned model, and change review.
+
+```json
+{
+  "agent_id": "demo-clean",
+  "agent_name": "support-bot",
+  "environment": "production",
+  "iam_policy": { "statements": [{ "actions": ["s3:GetObject"], "resources": ["arn:aws:s3:::customer-records/*"] }] },
+  "accessible_resources": [{ "arn": "arn:aws:s3:::customer-records", "data_classification": "PII" }],
+  "data_boundary": { "mode": "restricted", "allowed_classifications": ["PII"], "processing_basis": "GDPR Art.6(1)(b) contract performance" },
+  "logging": { "action_trace_enabled": true, "sink": "cloudtrail", "immutable_store": true, "captured_fields": ["model_id", "model_version", "prompt_hash"] },
+  "guardrails": { "input_filtering": true, "output_validation": true, "provider": "bedrock-guardrails" },
+  "has_downstream_execution": true,
+  "human_oversight": { "approval_required_for": ["issue_refund", "send_email"], "kill_switch": true },
+  "high_risk_actions": ["issue_refund", "send_email"],
+  "model": { "model_id": "anthropic.claude-sonnet", "version": "20250219-v1" },
+  "lifecycle": { "change_review": true }
+}
+```
+
+Start from the broken one and fix the fields one at a time — flip `action_trace_enabled` to `true`, pin the model `version`, add a `kill_switch` — and watch the assurance score climb as each control passes.
 
 ## How scoring works
 
