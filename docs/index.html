@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>A-ACAF — AI Agent Control Assurance Console</title>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script src="audit_data.js"></script>
+<style>
+  :root{
+    --bg:#0a1220; --panel:#0f1a2e; --panel2:#13233d; --line:#1e3252;
+    --ink:#e8eef7; --mute:#7f92ad; --dim:#5c6f8a;
+    --crit:#ff5a52; --high:#ff9d3c; --med:#ffd23f; --good:#33d69f; --sig:#3ba6ff;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:'Inter',-apple-system,system-ui,sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;line-height:1.5}
+  #root{max-width:1240px;margin:0 auto;padding:28px 22px 60px}
+  .mono{font-family:var(--mono)}
+  a{color:var(--sig);text-decoration:none}
+
+  /* header */
+  .top{display:flex;align-items:flex-start;justify-content:space-between;
+    gap:20px;flex-wrap:wrap;margin-bottom:22px}
+  .brand-k{font-family:var(--mono);font-size:11px;letter-spacing:3px;
+    color:var(--sig);text-transform:uppercase;margin-bottom:6px}
+  h1{font-size:26px;font-weight:700;letter-spacing:-.5px}
+  .sub{color:var(--mute);font-size:13px;margin-top:5px;max-width:560px}
+  .frameworks{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .fw{font-family:var(--mono);font-size:10.5px;color:var(--dim);
+    border:1px solid var(--line);border-radius:4px;padding:3px 8px}
+
+  /* toggle */
+  .toggle{display:inline-flex;background:var(--panel);border:1px solid var(--line);
+    border-radius:9px;padding:4px;gap:2px}
+  .toggle button{font-family:var(--mono);font-size:12px;font-weight:500;
+    background:transparent;color:var(--mute);border:0;border-radius:6px;
+    padding:9px 16px;cursor:pointer;transition:.15s;white-space:nowrap}
+  .toggle button.on-bad{background:var(--crit);color:#2a0605}
+  .toggle button.on-good{background:var(--good);color:#042318}
+  .toggle-cap{font-size:11px;color:var(--dim);margin-top:7px;text-align:right}
+
+  /* fleet summary strip */
+  .strip{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:1px;
+    background:var(--line);border:1px solid var(--line);border-radius:12px;
+    overflow:hidden;margin-bottom:24px}
+  .cell{background:var(--panel);padding:16px 18px}
+  .cell .lab{font-size:11px;color:var(--mute);text-transform:uppercase;
+    letter-spacing:.8px;margin-bottom:8px}
+  .cell .big{font-family:var(--mono);font-size:32px;font-weight:700;line-height:1}
+  .cell .unit{font-size:14px;color:var(--dim)}
+
+  /* layout */
+  .grid{display:grid;grid-template-columns:340px 1fr;gap:20px}
+  @media(max-width:840px){.grid{grid-template-columns:1fr}}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px}
+  .panel-h{padding:14px 16px;border-bottom:1px solid var(--line);
+    font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:1px}
+
+  /* agent list */
+  .agent{padding:15px 16px;border-bottom:1px solid var(--line);cursor:pointer;
+    display:flex;align-items:center;gap:14px;transition:.12s}
+  .agent:last-child{border-bottom:0}
+  .agent:hover{background:var(--panel2)}
+  .agent.sel{background:var(--panel2);box-shadow:inset 3px 0 0 var(--sig)}
+  .ring{position:relative;width:52px;height:52px;flex:0 0 52px}
+  .ring svg{transform:rotate(-90deg)}
+  .ring .rv{position:absolute;inset:0;display:flex;align-items:center;
+    justify-content:center;font-family:var(--mono);font-size:14px;font-weight:700}
+  .agent-meta{min-width:0}
+  .agent-name{font-size:13.5px;font-weight:600;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  .agent-env{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:2px}
+  .chips{display:flex;gap:5px;margin-top:6px}
+  .chip{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:4px;font-weight:500}
+  .chip.c{background:rgba(255,90,82,.15);color:var(--crit)}
+  .chip.h{background:rgba(255,157,60,.15);color:var(--high)}
+  .chip.m{background:rgba(255,210,63,.15);color:var(--med)}
+  .chip.ok{background:rgba(51,214,159,.15);color:var(--good)}
+
+  /* detail */
+  .det-h{padding:18px 20px;border-bottom:1px solid var(--line)}
+  .det-title{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .det-title h2{font-size:18px;font-weight:700}
+  .grade{font-family:var(--mono);font-size:11px;padding:4px 9px;border-radius:5px;font-weight:500}
+  .det-score{font-family:var(--mono);font-size:12px;color:var(--mute);margin-top:6px}
+
+  .filters{display:flex;gap:6px;padding:12px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .filt{font-family:var(--mono);font-size:11px;background:var(--panel2);
+    border:1px solid var(--line);color:var(--mute);border-radius:6px;
+    padding:5px 10px;cursor:pointer}
+  .filt.on{border-color:var(--sig);color:var(--ink)}
+
+  .finding{padding:16px 20px;border-bottom:1px solid var(--line)}
+  .finding:last-child{border-bottom:0}
+  .f-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .sev{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.5px;
+    padding:3px 8px;border-radius:4px;text-transform:uppercase}
+  .sev.CRITICAL{background:var(--crit);color:#2a0605}
+  .sev.HIGH{background:var(--high);color:#2a1400}
+  .sev.MEDIUM{background:var(--med);color:#2a2200}
+  .sev.PASS{background:rgba(51,214,159,.15);color:var(--good)}
+  .f-id{font-family:var(--mono);font-size:11px;color:var(--dim)}
+  .f-title{font-size:14px;font-weight:600}
+  .f-row{display:grid;grid-template-columns:96px 1fr;gap:12px;margin-top:8px;
+    font-size:12.5px}
+  .f-row .k{color:var(--dim);font-size:11px;text-transform:uppercase;
+    letter-spacing:.5px;padding-top:1px}
+  .f-row .v{color:#c9d6e8}
+  .maps{display:flex;flex-wrap:wrap;gap:5px;margin-top:3px}
+  .map{font-family:var(--mono);font-size:10px;color:var(--dim);
+    border:1px solid var(--line);border-radius:4px;padding:2px 7px}
+  .pass-note{padding:26px 20px;color:var(--good);font-family:var(--mono);font-size:13px}
+  .foot{margin-top:26px;color:var(--dim);font-size:11px;text-align:center;
+    font-family:var(--mono)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState, useMemo} = React;
+const DATA = window.AUDIT_DATA;
+
+const sevColor = s => ({CRITICAL:'var(--crit)',HIGH:'var(--high)',MEDIUM:'var(--med)',LOW:'var(--dim)'}[s]||'var(--dim)');
+const scoreColor = v => v>=90?'var(--good)':v>=60?'var(--med)':'var(--crit)';
+const gradeStyle = v => ({background:v>=90?'rgba(51,214,159,.15)':v>=60?'rgba(255,210,63,.15)':'rgba(255,90,82,.15)',
+                          color:scoreColor(v)});
+
+function Ring({value}){
+  const r=22, c=2*Math.PI*r, off=c*(1-value/100);
+  return (
+    <div className="ring">
+      <svg width="52" height="52">
+        <circle cx="26" cy="26" r={r} fill="none" stroke="var(--line)" strokeWidth="5"/>
+        <circle cx="26" cy="26" r={r} fill="none" stroke={scoreColor(value)} strokeWidth="5"
+          strokeDasharray={c} strokeDashoffset={off} strokeLinecap="round"/>
+      </svg>
+      <div className="rv" style={{color:scoreColor(value)}}>{value}</div>
+    </div>
+  );
+}
+
+function App(){
+  const [state,setState]=useState('before');
+  const [sel,setSel]=useState(0);
+  const [filter,setFilter]=useState('ALL');
+  const fleet = DATA[state];
+
+  const fleetAvg = Math.round(fleet.reduce((a,r)=>a+r.assurance_score,0)/fleet.length);
+  const totCrit = fleet.reduce((a,r)=>a+r.summary.critical,0);
+  const totHigh = fleet.reduce((a,r)=>a+r.summary.high,0);
+  const agent = fleet[sel];
+
+  const findings = useMemo(()=>{
+    let f = agent.findings.filter(x=>x.status==='FAIL');
+    const ord={CRITICAL:0,HIGH:1,MEDIUM:2,LOW:3};
+    f.sort((a,b)=>ord[a.severity]-ord[b.severity]);
+    if(filter!=='ALL') f=f.filter(x=>x.severity===filter);
+    return f;
+  },[agent,filter]);
+
+  return (
+    <div>
+      <div className="top">
+        <div>
+          <div className="brand-k">A-ACAF · Agent Control Assurance</div>
+          <h1>AI Agent Governance Console</h1>
+          <div className="sub">Continuous control assurance for deployed AI agents — scored against
+            three governance frameworks, with audit-grade findings and remediation.</div>
+          <div className="frameworks">
+            <span className="fw">NIST AI RMF 1.0</span>
+            <span className="fw">ISO/IEC 42001:2023</span>
+            <span className="fw">OWASP LLM Top 10</span>
+          </div>
+        </div>
+        <div>
+          <div className="toggle">
+            <button className={state==='before'?'on-bad':''} onClick={()=>{setState('before');setSel(0);}}>As deployed</button>
+            <button className={state==='after'?'on-good':''} onClick={()=>{setState('after');setSel(0);}}>After remediation</button>
+          </div>
+          <div className="toggle-cap">Same fleet, before vs. after control remediation</div>
+        </div>
+      </div>
+
+      <div className="strip">
+        <div className="cell">
+          <div className="lab">Fleet assurance</div>
+          <div className="big" style={{color:scoreColor(fleetAvg)}}>{fleetAvg}<span className="unit">/100</span></div>
+        </div>
+        <div className="cell">
+          <div className="lab">Agents assessed</div>
+          <div className="big">{fleet.length}</div>
+        </div>
+        <div className="cell">
+          <div className="lab">Critical findings</div>
+          <div className="big" style={{color:totCrit?'var(--crit)':'var(--good)'}}>{totCrit}</div>
+        </div>
+        <div className="cell">
+          <div className="lab">High findings</div>
+          <div className="big" style={{color:totHigh?'var(--high)':'var(--good)'}}>{totHigh}</div>
+        </div>
+      </div>
+
+      <div className="grid">
+        <div className="panel">
+          <div className="panel-h">Agent fleet</div>
+          {fleet.map((r,i)=>(
+            <div key={r.agent_id} className={'agent'+(i===sel?' sel':'')} onClick={()=>{setSel(i);setFilter('ALL');}}>
+              <Ring value={r.assurance_score}/>
+              <div className="agent-meta">
+                <div className="agent-name">{r.agent_name}</div>
+                <div className="agent-env">{r.environment} · {r.agent_id}</div>
+                <div className="chips">
+                  {r.summary.critical>0 && <span className="chip c">{r.summary.critical} CRIT</span>}
+                  {r.summary.high>0 && <span className="chip h">{r.summary.high} HIGH</span>}
+                  {r.summary.medium>0 && <span className="chip m">{r.summary.medium} MED</span>}
+                  {r.summary.failed===0 && <span className="chip ok">ALL PASS</span>}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="panel">
+          <div className="det-h">
+            <div className="det-title">
+              <h2 className="mono">{agent.agent_name}</h2>
+              <span className="grade" style={gradeStyle(agent.assurance_score)}>{agent.grade}</span>
+            </div>
+            <div className="det-score">Assurance score {agent.assurance_score}/100 ·
+              {' '}{agent.summary.passed}/{agent.summary.total_controls} controls passed ·
+              {' '}assessed {agent.assessed_at.slice(0,10)}</div>
+          </div>
+
+          {agent.summary.failed>0 && (
+            <div className="filters">
+              {['ALL','CRITICAL','HIGH','MEDIUM'].map(f=>(
+                <button key={f} className={'filt'+(filter===f?' on':'')} onClick={()=>setFilter(f)}>{f}</button>
+              ))}
+            </div>
+          )}
+
+          {agent.summary.failed===0 ? (
+            <div className="pass-note">✓ All 13 controls satisfied — agent is deployment-ready.</div>
+          ) : findings.map(f=>(
+            <div key={f.control_id} className="finding">
+              <div className="f-top">
+                <span className={'sev '+f.severity}>{f.severity}</span>
+                <span className="f-id">{f.control_id}</span>
+              </div>
+              <div className="f-title">{f.title}</div>
+              <div className="f-row"><div className="k">Evidence</div><div className="v">{f.evidence}</div></div>
+              <div className="f-row"><div className="k">Business risk</div><div className="v">{f.business_risk}</div></div>
+              <div className="f-row"><div className="k">Remediation</div><div className="v">{f.remediation}</div></div>
+              <div className="f-row"><div className="k">Mapped to</div>
+                <div className="maps">
+                  {f.nist_ai_rmf.map(m=><span key={m} className="map">NIST {m}</span>)}
+                  {f.owasp_llm.map(m=><span key={m} className="map">{m}</span>)}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="foot">A-ACAF — AI Agent Control Assurance Framework · synthetic assessment data · built by Ash</div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
