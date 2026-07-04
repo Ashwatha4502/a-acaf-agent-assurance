@@ -28,7 +28,7 @@ That gap is exactly where compliance failures will surface first. A-ACAF is a wo
 |---|---|---|
 | Access & least privilege | No wildcard permissions; no destructive access to PHI/PII | NIST MANAGE-2.1 · ISO A.6.2.2 · OWASP LLM06 |
 | Data governance | Explicit data boundary; lawful basis for personal data | NIST MAP-4.1 · ISO A.7.2 |
-| Auditability | Action tracing enabled, immutable, attributable to model+version+prompt | NIST MEASURE-2.8 · ISO A.6.2.6 · OWASP LLM08 |
+| Auditability | Action tracing enabled, immutable, attributable to model+version+prompt | NIST MEASURE-2.8 · ISO A.6.2.8 |
 | Adversarial resilience | Input guardrails vs. prompt injection; output validation | NIST MEASURE-2.7 · OWASP LLM01/LLM05 |
 | Human oversight | Approval gates for high-risk actions; kill switch | NIST MANAGE-2.3 · ISO A.6.2.7 · EU AI Act |
 | Model lifecycle | Model version pinned; change review before production | NIST MANAGE-4.1 · ISO A.6.2.5 |
@@ -39,7 +39,7 @@ The full mapping is the single source of truth in [`rubric/controls.py`](rubric/
 
 Open the [live console](https://ashwatha4502.github.io/a-acaf-agent-assurance/), click **Audit your own**, and paste one of the configs below into the editor. The scoring runs entirely client-side — no data leaves your browser.
 
-**A broken agent — scores 28/100 (F, not fit for production):** wildcard S3 access over PII, no logging, no guardrails, no human oversight, unpinned model.
+**A broken agent — scores 0/100 (F, not fit for production):** wildcard S3 access over PII (a wildcard is a superset of every destructive action, so it fails the critical destructive-permissions control), no logging, no guardrails, no human oversight, unpinned model. The two log-integrity controls report **N/A** rather than passing vacuously — there are no logs to protect.
 
 ```json
 {
@@ -85,15 +85,20 @@ Start from the broken one and fix the fields one at a time — flip `action_trac
 
 A flat pass/fail ratio hides real risk, so the assurance score is **severity-weighted**: a critical failure (destructive access to regulated data, or no action logging at all) costs far more than a medium one. Scores map to grades from **A – Deployment-ready** down to **F – Not fit for production**.
 
+Two design principles a reviewer should know about (full rationale in [DESIGN.md](DESIGN.md)):
+
+- **Checks fail closed.** Missing or undeclared configuration is treated as the risky state — a wildcard grant counts as destructive, an undeclared data boundary doesn't dodge the lawful-basis control, and an empty config scores an F, not a D.
+- **N/A is a real status.** Controls that can't be evaluated for a given config (log immutability when logging is off entirely; permissions when no IAM policy was provided) are reported as *not assessable* and excluded from the score denominator — so disabling a parent control can never improve a score through its dependents.
+
 ## The before/after story
 
 The demo ships with three synthetic agents modeled on real enterprise deployments — a healthcare claims-triage agent (PHI), a fintech support agent (PII), and an internal DevOps agent — each in an *as-deployed* and a *remediated* state. Flip the toggle and the fleet moves from failing to deployment-ready:
 
 | | As deployed | After remediation |
 |---|---|---|
-| Fleet assurance score | **37 / 100** | **100 / 100** |
-| Critical findings | 6 | 0 |
-| High findings | 12 | 0 |
+| Fleet assurance score | **28 / 100** | **100 / 100** |
+| Critical findings | 7 | 0 |
+| High findings | 13 | 0 |
 
 <p align="center">
   <img src="docs/img/dashboard_after.png" width="90%" alt="The same agent fleet after remediation, all scoring 100 and deployment-ready" />
@@ -145,7 +150,14 @@ python run_audit.py --state after
 python run_audit.py --agents my_fleet.json --org "My Company"
 ```
 
-Open the interactive console locally by opening `docs/index.html` in a browser. The live version is published from `docs/` via GitHub Pages.
+Run the test suite (covers the fail-closed edge cases, scoring properties, demo-score regression, and Python↔JavaScript engine parity):
+
+```bash
+pip install pytest
+python -m pytest tests/ -v
+```
+
+Open the interactive console locally by opening `docs/index.html` in a browser. The live version is published from `docs/` via GitHub Pages. If controls or mock data change, regenerate the derived artifacts (`docs/audit_data.js` and the mapping table) with `python export_dashboard_data.py`.
 
 **Requirements:** Python 3.10+, `pip install reportlab`.
 
