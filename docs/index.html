@@ -302,7 +302,7 @@ function App(){
               <span className="grade" style={gradeStyle(agent.assurance_score)}>{agent.grade}</span>
             </div>
             <div className="det-score">Assurance score {agent.assurance_score}/100 ·
-              {' '}{agent.summary.passed}/{agent.summary.total_controls} controls passed ·
+              {' '}{agent.summary.passed}/{agent.summary.total_controls - (agent.summary.not_assessable||0)} assessable controls passed{(agent.summary.not_assessable||0) > 0 ? ` (${agent.summary.not_assessable} N/A)` : ''} ·
               {' '}assessed {agent.assessed_at.slice(0,10)}</div>
           </div>
 
