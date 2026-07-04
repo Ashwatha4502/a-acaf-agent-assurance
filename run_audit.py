@@ -66,7 +66,9 @@ def main():
         if s["failed"]:
             print(f"          {RED}{s['critical']} critical{RESET}  "
                   f"{YEL}{s['high']} high{RESET}  {s['medium']} medium  "
-                  f"{DIM}({s['passed']}/{s['total_controls']} controls passed){RESET}")
+                  f"{DIM}({s['passed']}/{s['total_controls'] - s.get('not_assessable', 0)} "
+                  f"assessable controls passed"
+                  f"{', ' + str(s['not_assessable']) + ' N/A' if s.get('not_assessable') else ''}){RESET}")
         else:
             print(f"          {GRN}all {s['total_controls']} controls passed{RESET}")
     print()

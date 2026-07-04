@@ -76,19 +76,31 @@ def audit_agent(agent: dict) -> AgentAuditResult:
 
     for ctrl in CONTROLS:
         weight = SEVERITY_WEIGHT[ctrl.severity]
-        max_penalty += weight
-        passed, evidence = ctrl.check(agent)
-        if not passed:
+        result, evidence = ctrl.check(agent)
+        # result is True (pass), False (fail), or None (not assessable).
+        # N/A controls are excluded from the denominator: they neither reward
+        # nor punish, so disabling a parent control (e.g. logging) can never
+        # improve the score via its dependent controls.
+        if result is None:
+            status = "N/A"
+        elif result:
+            status = "PASS"
+            max_penalty += weight
+        else:
+            status = "FAIL"
+            max_penalty += weight
             penalty += weight
         findings.append(Finding(
             control_id=ctrl.id,
             title=ctrl.title,
             domain=ctrl.domain.value,
-            status="PASS" if passed else "FAIL",
-            severity=ctrl.severity.value if not passed else "-",
+            status=status,
+            severity=ctrl.severity.value if status == "FAIL" else "-",
             evidence=evidence,
-            business_risk=ctrl.rationale if not passed else "Control satisfied.",
-            remediation=ctrl.remediation if not passed else "-",
+            business_risk=(ctrl.rationale if status == "FAIL"
+                           else "Control not assessable for this configuration." if status == "N/A"
+                           else "Control satisfied."),
+            remediation=ctrl.remediation if status == "FAIL" else "-",
             nist_ai_rmf=ctrl.nist_ai_rmf,
             iso_42001=ctrl.iso_42001,
             owasp_llm=ctrl.owasp_llm,
@@ -98,10 +110,12 @@ def audit_agent(agent: dict) -> AgentAuditResult:
     score = round(100 * (1 - (penalty / max_penalty))) if max_penalty else 100
 
     fails = [f for f in findings if f.status == "FAIL"]
+    n_na = sum(1 for f in findings if f.status == "N/A")
     summary = {
         "total_controls": len(findings),
-        "passed": len(findings) - len(fails),
+        "passed": len(findings) - len(fails) - n_na,
         "failed": len(fails),
+        "not_assessable": n_na,
         "critical": sum(1 for f in fails if f.severity == "CRITICAL"),
         "high": sum(1 for f in fails if f.severity == "HIGH"),
         "medium": sum(1 for f in fails if f.severity == "MEDIUM"),
