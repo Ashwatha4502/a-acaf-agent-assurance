@@ -111,8 +111,13 @@ def _chk_no_destructive_on_sensitive(agent: dict) -> tuple[Optional[bool], str]:
     if "iam_policy" not in agent:
         return None, "Not assessable: no IAM policy provided for this agent."
     hits = []
+    # Use .get("arn") — a user-supplied resource may omit "arn" while still
+    # declaring a sensitive classification. A hard r["arn"] subscript raised
+    # KeyError and crashed the whole audit, which violates this module's
+    # fail-closed contract (a malformed config must be assessed, not fatal).
     sensitive_resources = {r["arn"] for r in agent.get("accessible_resources", [])
-                           if r.get("data_classification") in ("PHI", "PII", "sensitive")}
+                           if r.get("arn") is not None
+                           and r.get("data_classification") in ("PHI", "PII", "sensitive")}
     for stmt in agent.get("iam_policy", {}).get("statements", []):
         actions = stmt.get("actions", [])
         actions = actions if isinstance(actions, list) else [actions]

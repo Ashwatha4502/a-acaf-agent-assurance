@@ -117,6 +117,35 @@ def test_disabling_logging_never_improves_score():
             > audit_agent(logging_off).assurance_score)
 
 
+# ---------------------------------------------------------------------------
+# Robustness: malformed user-supplied resources must not crash the audit
+# ---------------------------------------------------------------------------
+
+def test_resource_missing_arn_does_not_crash():
+    """Regression: AAC-ACCESS-02 built its sensitive-resource set with a hard
+    r["arn"] subscript. A user-supplied resource that declares a sensitive
+    classification but omits 'arn' raised KeyError and aborted the whole audit.
+    Fail-closed means the config is assessed, not fatal."""
+    agent = _minimal_clean_agent()
+    agent["iam_policy"] = {"statements": [
+        {"actions": ["s3:DeleteObject"], "resources": ["*"]}]}
+    agent["accessible_resources"] = [{"data_classification": "PII"}]  # no 'arn'
+    result = audit_agent(agent)  # must not raise
+    # A destructive action over resource '*' still fails on the wildcard target.
+    assert _finding(result, "AAC-ACCESS-02").status == "FAIL"
+
+
+def test_resource_missing_arn_specific_resource_is_ignored():
+    """A sensitive resource with no ARN can't be matched to a specific-resource
+    grant, so a destructive action scoped to a *named* bucket is not a hit."""
+    agent = _minimal_clean_agent()
+    agent["iam_policy"] = {"statements": [
+        {"actions": ["s3:DeleteObject"], "resources": ["arn:aws:s3:::other"]}]}
+    agent["accessible_resources"] = [{"data_classification": "PII"}]  # no 'arn'
+    result = audit_agent(agent)  # must not raise
+    assert _finding(result, "AAC-ACCESS-02").status == "PASS"
+
+
 def test_na_not_counted_as_passed():
     agent = _minimal_clean_agent()
     agent["logging"] = {"action_trace_enabled": False}
